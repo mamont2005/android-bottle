@@ -122,8 +122,14 @@ public class BottleActivity extends Activity
 		
 		// Battery status.
 		
-		send("battery.txt", (currentBatteryLevel + "," + currentBatteryStatus + "," + currentBatteryTemperature + "," + currentBatteryVoltage).getBytes());
-
+		new Thread(new Runnable() 
+		{
+	        public void run() 
+	        {
+	    		send("battery.txt", (currentBatteryLevel + "," + currentBatteryStatus + "," + currentBatteryTemperature + "," + currentBatteryVoltage).getBytes());
+	        }
+		}).start();
+		
 		
 		// Location.
 		
@@ -360,7 +366,7 @@ public class BottleActivity extends Activity
 		{
 			Log.e(TAG, "send: couldn't open socket");
 		}
-		catch (Throwable t) 
+		catch (Throwable e) 
 		{
 			Log.e(TAG, "send: unknown exception");
 		}

@@ -179,7 +179,7 @@ public class BottleActivity extends Activity
 			}
 		}
 		
-	    log.append("g=" + gpsLocationsSent + ", p=" + picturesSent + ", b=" + bytesSent);
+	    log.append("g=" + gpsLocationsSent + ", p=" + picturesSent + ", b=" + bytesSent + "   ");
 	    
 		Log.i(TAG, "<- act");
 	}
@@ -385,6 +385,8 @@ public class BottleActivity extends Activity
 			Log.e(TAG, serverResponseMessage);
 			
 			outputStream.close();
+			
+			bytesSent += data.length;
 		}
 		catch (UnknownHostException e) 
 		{

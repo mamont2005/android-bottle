@@ -63,6 +63,15 @@ public class BottleActivity extends Activity
     int currentBatteryTemperature = -1; 
     int currentBatteryVoltage = -1; 
     
+    Location currentNetworkLocation;
+    Location currentGpsLocation;
+    
+    byte[] currentPicture;
+    
+    int gpsLocationsSent = 0;
+    int picturesSent = 0;
+    int bytesSent = 0;
+    
 	
 	
 	@Override
@@ -170,6 +179,8 @@ public class BottleActivity extends Activity
 			}
 		}
 		
+	    log.append("g=" + gpsLocationsSent + ", p=" + picturesSent + ", b=" + bytesSent);
+	    
 		Log.i(TAG, "<- act");
 	}
 	
@@ -266,11 +277,17 @@ public class BottleActivity extends Activity
 		{
 			Log.i(TAG, "-> PictureCB::onReceive"); 
 		
-			log.append("picture taken\n");
-			send("cam.jpg", data);
-			log.append("picture sent\n");
-			inPicture = false;
+			currentPicture = data;
+			new Thread(new Runnable() 
+			{
+		        public void run() 
+		        {
+					send("cam.jpg", currentPicture);
+					picturesSent++;
+		        }
+			}).start();
 			
+			inPicture = false;
 			Log.i(TAG, "<- PictureCB::onReceive"); 
 		}
 	};
@@ -290,9 +307,14 @@ public class BottleActivity extends Activity
 			if (!locationNetworkSent)
 			{
 				locationNetworkSent = true;
-				log.append("location: " + location.getProvider() + "\n");
-				send(location.getProvider() + ".txt", location.toString().getBytes());
-				log.append("location sent\n");
+				currentNetworkLocation = location;
+				new Thread(new Runnable() 
+				{
+			        public void run() 
+			        {
+						send(currentNetworkLocation.getProvider() + ".txt", currentNetworkLocation.toString().getBytes());
+			        }
+				}).start();
 			}
 
 			Log.i(TAG, "<- LocationListenerNetworkCB::onLocationChanged"); 
@@ -314,9 +336,15 @@ public class BottleActivity extends Activity
 			if (!locationGpsSent)
 			{
 				locationGpsSent = true;
-				log.append("location: " + location.getProvider() + "\n");
-				send(location.getProvider() + ".txt", location.toString().getBytes());
-				log.append("location sent\n");
+				currentGpsLocation = location;
+				new Thread(new Runnable() 
+				{
+			        public void run() 
+			        {
+						send(currentGpsLocation.getProvider() + ".txt", currentGpsLocation.toString().getBytes());
+						gpsLocationsSent++;
+			        }
+				}).start();
 			}
 			
 			Log.i(TAG, "<- LocationListenerGpsCB::onLocationChanged"); 

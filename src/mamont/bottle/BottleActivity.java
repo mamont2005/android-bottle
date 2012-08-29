@@ -25,6 +25,7 @@ import android.hardware.Camera.PictureCallback;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -42,7 +43,8 @@ public class BottleActivity extends Activity
 	String twoHyphens = "--";
 	String boundary =  "*****";
 	//long periodMs = 15 * 60000;
-	long periodMs = 15 * 1000;				//...
+	//long periodMs = 15 * 1000;				//...
+	long periodMs = 5 * 60000;
 	
 	TextView log;
 	Camera camera = null;
@@ -55,6 +57,12 @@ public class BottleActivity extends Activity
 	boolean locationNetworkSent = false;
 	boolean locationGpsSent = false;
 	boolean inPicture = false;
+	
+	int currentBatteryLevel = -1;
+    int currentBatteryStatus = -1; 
+    int currentBatteryTemperature = -1; 
+    int currentBatteryVoltage = -1; 
+    
 	
 	
 	@Override
@@ -91,9 +99,17 @@ public class BottleActivity extends Activity
 		previewHolder = preview.getHolder();
 		previewHolder.addCallback(surfaceCB);			// --> act.
 		previewHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+
+		
+		// Battery status.
+		
+		IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED); 
+	    registerReceiver(batteryReceiverCB, filter); 
+		
+
+	    // Done.
 	
 		log.append("initialized\n");
-
 		Log.i(TAG, "<- onCreate");
 	}
 
@@ -102,6 +118,11 @@ public class BottleActivity extends Activity
 	public void act()
 	{
 		Log.i(TAG, "-> act");
+		
+		
+		// Battery status.
+		
+		send("battery.txt", (currentBatteryLevel + "," + currentBatteryStatus + "," + currentBatteryTemperature + "," + currentBatteryVoltage).getBytes());
 
 		
 		// Location.
@@ -109,8 +130,8 @@ public class BottleActivity extends Activity
 		locationNetworkSent = false;
 		locationGpsSent = false;
 		LocationManager locationManager = (LocationManager)this.getSystemService(Context.LOCATION_SERVICE);
-		locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, new LocationListenerNetworkCB());  //...
-		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListenerGpsCB());		//...
+		locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, new LocationListenerNetworkCB());
+		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListenerGpsCB());
 		
 
 		if (camera == null)
@@ -177,6 +198,26 @@ public class BottleActivity extends Activity
 			Log.i(TAG, "<- alarmReceiverCB::onReceive"); 
 		}
 	}; 
+	
+	
+	
+	
+	BroadcastReceiver batteryReceiverCB = new BroadcastReceiver() 
+	{ 
+        public void onReceive(Context context, Intent intent) 
+        { 
+            Log.i(TAG, "-> batteryReceiverCB::onReceive"); 
+            
+            int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1); 
+            int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1); 
+            currentBatteryLevel = 100 * level / scale;
+            currentBatteryStatus = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            currentBatteryTemperature = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1); 
+            currentBatteryVoltage = intent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1); 
+            
+            Log.i(TAG, "<- batteryReceiverCB::onReceive"); 
+        } 
+    }; 
 	
 	
 	
@@ -276,7 +317,7 @@ public class BottleActivity extends Activity
 		}
 	};
 	
-
+	
 	
 	void send(String fileName, byte[] data)
 	{

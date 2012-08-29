@@ -354,12 +354,16 @@ public class BottleActivity extends Activity
 		}
 		catch (UnknownHostException e) 
 		{
-			Log.e(TAG, "Server Not Found");
+			Log.e(TAG, "send: server not found");
 		} 
 		catch (IOException e) 
 		{
-			Log.e(TAG, "Couldn't open socket");
-		}        
+			Log.e(TAG, "send: couldn't open socket");
+		}
+		catch (Throwable t) 
+		{
+			Log.e(TAG, "send: unknown exception");
+		}
 	}
 		
 	

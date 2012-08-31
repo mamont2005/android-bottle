@@ -31,6 +31,8 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.TextView;
 
 
@@ -42,9 +44,7 @@ public class BottleActivity extends Activity
 	String lineEnd = "\r\n";
 	String twoHyphens = "--";
 	String boundary =  "*****";
-	//long periodMs = 15 * 60000;
-	//long periodMs = 15 * 1000;				//...
-	long periodMs = 5 * 60000;
+	long periodMs = 15 * 1000;				//... First period.
 	
 	TextView log;
 	Camera camera = null;
@@ -56,7 +56,6 @@ public class BottleActivity extends Activity
 	
 	boolean locationNetworkSent = false;
 	boolean locationGpsSent = false;
-	boolean inPicture = false;
 	
 	int currentBatteryLevel = -1;
     int currentBatteryStatus = -1; 
@@ -72,6 +71,8 @@ public class BottleActivity extends Activity
     int picturesSent = 0;
     int bytesSent = 0;
     
+    AlarmManager alarmMgr = null;
+    PendingIntent alarmPending = null;
 	
 	
 	@Override
@@ -85,28 +86,39 @@ public class BottleActivity extends Activity
 		log = (TextView)findViewById(R.id.log);
 		log.setText("started\n");
 		
+		/*Window window = getWindow();
+		window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD); 
+		window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+		window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);*/ 
+
+		
 		
 		// Alarm.
 
 		registerReceiver(alarmReceiverCB, alarmFilter); 
 		
 		final Intent intent = new Intent(ACTION_NAME);
-		final PendingIntent pending = PendingIntent.getBroadcast(this, 0, intent, 0);
+		alarmPending = PendingIntent.getBroadcast(this, 0, intent, 0);
 		
-		AlarmManager alarmMgr = (AlarmManager)this.getSystemService(Context.ALARM_SERVICE);
-		alarmMgr.cancel(pending);
+		alarmMgr = (AlarmManager)this.getSystemService(Context.ALARM_SERVICE);
+		alarmMgr.cancel(alarmPending);
 		alarmMgr.setRepeating(
 			AlarmManager.RTC_WAKEUP, 
 			System.currentTimeMillis() + periodMs,
 			periodMs, 
-			pending);
+			alarmPending);
+			
+		// 09	  Intent intent = new Intent(getBaseContext(), OnAlarmReceive.class);
+		// 10	  PendingIntent pendingIntent = PendingIntent.getBroadcast(
+		// 11	     MainActivity.this, 0, intent,
+		// 12	     PendingIntent.FLAG_UPDATE_CURRENT);
 
 
 		// Camera.
 		
 		preview = (SurfaceView)findViewById(R.id.preview);
 		previewHolder = preview.getHolder();
-		previewHolder.addCallback(surfaceCB);			// --> act.
+		previewHolder.addCallback(surfaceCB);
 		previewHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
 		
@@ -127,7 +139,7 @@ public class BottleActivity extends Activity
 	public void act()
 	{
 		Log.i(TAG, "-> act");
-		
+				
 		
 		// Battery status.
 		
@@ -140,44 +152,73 @@ public class BottleActivity extends Activity
 		}).start();
 		
 		
+		// Change alarm period.
+
+		int newPeriodMs;
+		if (currentBatteryLevel > 90)
+			newPeriodMs = 1 * 60000;
+		if (currentBatteryLevel > 75)
+			newPeriodMs = 5 * 60000;
+		else if (currentBatteryLevel > 50)
+			newPeriodMs = 15 * 60000;
+		else if (currentBatteryLevel > 10)
+			newPeriodMs = 60 * 60000;
+		else
+			newPeriodMs = 4 * 60 * 60000;
+
+		
+				newPeriodMs = 60 * 1000;		//...
+		
+		
+		if (newPeriodMs != periodMs)
+		{
+			periodMs = newPeriodMs;
+		
+			alarmMgr.cancel(alarmPending);
+			alarmMgr.setRepeating(
+				AlarmManager.RTC_WAKEUP, 
+				System.currentTimeMillis() + periodMs,
+				periodMs, 
+				alarmPending);
+		}
+		
+		
+		
 		// Location.
 		
 		locationNetworkSent = false;
 		locationGpsSent = false;
 		LocationManager locationManager = (LocationManager)this.getSystemService(Context.LOCATION_SERVICE);
-		locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, new LocationListenerNetworkCB());
-		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, new LocationListenerGpsCB());
-		
+		locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListenerNetworkCB);
+		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListenerGpsCB);
 
+		
+		// Camera.
+		
 		if (camera == null)
 		{
-			Log.i(TAG, "act - Camera.Open");
-			camera = Camera.open();
-			initCamera();
-		}
+			Log.i(TAG, "open camera");
 		
-		if (previewHolder.getSurface() == null)
-		{
-			Log.i(TAG, "act - create preview");
-			preview = (SurfaceView)findViewById(R.id.preview);
-			previewHolder = preview.getHolder();
-			previewHolder.addCallback(surfaceCB);			// --> act.
-			previewHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+			try
+			{	
+				camera = Camera.open();
+				initCamera();
+				camera.setPreviewDisplay(previewHolder);
+				camera.startPreview();
+				camera.takePicture(null, null, pictureCB);
+			}
+			catch (Throwable t)
+			{
+				Log.e(TAG, "camera failed", t);
+			}
 		}
 		else
 		{
-			if (inPicture)
-			{
-				Log.i(TAG, "act - inPicture");
-			}
-			else
-			{
-				Log.i(TAG, "act - startPreview, takePicture 1");
-				inPicture = true;
-				camera.startPreview();
-				camera.takePicture(null, null, new PictureCB());
-			}
+			Log.i(TAG, "camera skipped");
 		}
+		
+		
+		// Update on-screen info.
 		
 	    log.append("g=" + gpsLocationsSent + ", p=" + picturesSent + ", b=" + bytesSent + "   ");
 	    
@@ -210,6 +251,11 @@ public class BottleActivity extends Activity
 		{ 
 			Log.i(TAG, "-> alarmReceiverCB::onReceive"); 
 			
+			/*Intent startIntent = new Intent(context, BottleActivity.class);
+			startIntent.addFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);
+			context.startActivity(startIntent);
+			*/
+			
 			act();
 			
 			Log.i(TAG, "<- alarmReceiverCB::onReceive"); 
@@ -240,14 +286,16 @@ public class BottleActivity extends Activity
 	
 	SurfaceHolder.Callback surfaceCB = new SurfaceHolder.Callback() 
 	{
-		public void surfaceCreated(SurfaceHolder holder) {} 
-		
-		public void surfaceChanged(SurfaceHolder holder,
-								   int format, 
-								   int width,
-								   int height) 
+		public void surfaceCreated(SurfaceHolder holder) 
 		{
-			act();
+			Log.i(TAG, "-> surfaceCB::surfaceCreated"); 
+			Log.i(TAG, "<- surfaceCB::surfaceCreated"); 
+		} 
+		
+		public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) 
+		{
+			Log.i(TAG, "-> surfaceCB::surfaceChanged"); 
+			Log.i(TAG, "<- surfaceCB::surfaceChanged"); 
 		}
 		
 		public void surfaceDestroyed(SurfaceHolder holder) {}
@@ -257,23 +305,14 @@ public class BottleActivity extends Activity
 	
 	private void initCamera() 
 	{
-		try
-		{
-			camera.setPreviewDisplay(previewHolder);
-		}
-		catch (Throwable t)
-		{
-			Log.e(TAG, "initCamera: setPreviewDisplay failed", t);
-		}
-		
 		//TODO: Configure camera here.
 	}    
 
 
 
-	public class PictureCB implements PictureCallback 
+	PictureCallback pictureCB = new PictureCallback() 
 	{
-		public void onPictureTaken(byte[] data, Camera camera) 
+		public void onPictureTaken(byte[] data, Camera in_camera) 
 		{
 			Log.i(TAG, "-> PictureCB::onReceive"); 
 		
@@ -287,14 +326,18 @@ public class BottleActivity extends Activity
 		        }
 			}).start();
 			
-			inPicture = false;
+			camera.stopPreview(); 
+			camera.setPreviewCallback(null); 
+			camera.release();
+			camera = null;
+
 			Log.i(TAG, "<- PictureCB::onReceive"); 
 		}
 	};
 	
 	
 	
-	public class LocationListenerNetworkCB implements LocationListener
+	LocationListener locationListenerNetworkCB = new LocationListener()
 	{
 		public void onStatusChanged(String provider, int status, Bundle extras) {}
 		public void onProviderEnabled(String provider) {}
@@ -323,7 +366,7 @@ public class BottleActivity extends Activity
 	
 
 	
-	public class LocationListenerGpsCB implements LocationListener
+	LocationListener locationListenerGpsCB = new LocationListener()
 	{
 		public void onStatusChanged(String provider, int status, Bundle extras) {}
 		public void onProviderEnabled(String provider) {}
@@ -409,10 +452,7 @@ public class BottleActivity extends Activity
 	{
 		Log.i(TAG, "-> onResume");
 		
-		super.onResume();
-	  
-	  //camera = Camera.open();
-	  //startPreview();
+		super.onResume();		
 
 		Log.i(TAG, "<- onResume");
 	}
@@ -423,15 +463,6 @@ public class BottleActivity extends Activity
 	public void onPause() 
 	{
 		Log.i(TAG, "-> onPause");
-	
-	  //if (inPreview) 
-	  //{
-	//	camera.stopPreview();
-	  //}
-	  
-		camera.release();
-		camera = null;
-	  //inPreview = false;
 			
 		super.onPause();
 	  
@@ -439,145 +470,3 @@ public class BottleActivity extends Activity
 	}
 }
 
-
-
-
-//camera.setPreviewCallback(null); 
-//camera.release();
-
-
-
-
-/*        
-try 
-{
-	URL url = new URL(urlServer);
-	
-	HttpURLConnection connection = (HttpURLConnection)url.openConnection();
-	connection.setDoInput(true);
-	connection.setDoOutput(true);
-	connection.setUseCaches(false);
-	connection.setRequestMethod("POST");
-	connection.setRequestProperty("Connection", "Keep-Alive");
-	connection.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
-	
-	DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
-	outputStream.writeBytes(twoHyphens + boundary + lineEnd);
-	outputStream.writeBytes("Content-Disposition: form-data; name=\"uploadedfile\";filename=\"" + "testfile.txt" +"\"" + lineEnd);
-	outputStream.writeBytes(lineEnd);
-	
-	String tmp = "12345-test1\r\n";
-	//outputStream.write(tmp, 0, tmp.length());
-	outputStream.writeBytes(tmp);
-	
-	outputStream.writeBytes(lineEnd);
-	outputStream.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
-	outputStream.flush();
-
-	//int serverResponseCode = connection.getResponseCode();
-	String serverResponseMessage = connection.getResponseMessage();
-	
-	//Log.e(TAG, serverResponseCode);
-	Log.e(TAG, serverResponseMessage);
-	
-	outputStream.close();
-} 
-
-catch (UnknownHostException e) 
-{
-	Log.e(TAG, "Server Not Found");
-} 
-
-catch (IOException e) 
-{
-	Log.e(TAG, "Couldn't open socket");
-}
-*/    
-
-
-
-
-
-/*        	
-Socket socket = new Socket("mamont.be", 80);
-
-//InetAddress server = Inet4Address.getByName("mamont.be");
-//InetAddress server = Inet4Address.getByAddress(new byte[] { (byte)192, (byte)168, 0, 101 });
-//Socket socket = new Socket(server, 80);
-OutputStream out = socket.getOutputStream();
-
-PrintWriter output = new PrintWriter(out);
-output.print("GET\r\n");
-BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-//String str = input.readLine();
-//Log.e("111", str);
-
-int bytesAvailable = input.available();
-
-buffer = new byte[1000];
-
-input.read(buffer, 0, 1000);
-*/        	
-
-
-	/*public class AlarmReceiver extends BroadcastReceiver
-	{
-		public void onReceive(Context context, Intent intent) 
-		{
-			Log.i(TAG, "AlarmReceiver::onReceive");
-		}
-	};*/
-	
-	
-					//Camera.Parameters parameters = camera.getParameters();
-				//Camera.Size size = getBestPreviewSize(width, height, parameters);
-			
-				//if (size != null) 
-				//{
-					//parameters.setPreviewSize(size.width, size.height);
-					//camera.setParameters(parameters);
-					
-					
-					
-					
-					
-					
-/*						private Camera.Size getBestPreviewSize(int width, int height, Camera.Parameters parameters) 
-	{
-		Camera.Size result = null;
-
-		for (Camera.Size size : parameters.getSupportedPreviewSizes()) 
-		{
-			if (size.width <= width && size.height <= height) 
-			{
-				if (result == null) 
-				{
-					result = size;
-				}
-				else 
-				{
-					int resultArea = result.width * result.height;
-					int newArea = size.width * size.height;
-
-					if (newArea > resultArea) 
-					{
-						result = size;
-					}
-				}
-			}
-		}
-
-		return(result);
-	}
-*/
-
-/*			Handler handler = new Handler();
-			handler.postDelayed(new Runnable() 
-			{
-			  public void run() 
-			  {
-					//startPreview();
-			  }
-			}, 1000);
-*/

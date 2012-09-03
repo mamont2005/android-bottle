@@ -69,7 +69,7 @@ public class BottleActivity extends Activity
     int currentBatteryStatus = -1; 
     int currentBatteryTemperature = -1; 
     int currentBatteryVoltage = -1; 
-    int currentSignalStrength;
+    int currentSignalStrength = -1;
     
     Location currentNetworkLocation;
     Location currentGpsLocation;
@@ -391,10 +391,11 @@ public class BottleActivity extends Activity
 						send(currentNetworkLocation.getProvider() + ".txt", currentNetworkLocation.toString().getBytes());
 			        }
 				}).start();
-			}
 
-			locationManager.removeUpdates(locationListenerNetworkCB);
-			locationListenerNetworkRegisterd = false;
+				locationManager.removeUpdates(locationListenerNetworkCB);
+				locationListenerNetworkRegisterd = false;
+				numNetworkLocationUpdates = 0;
+			}
 			
 			Log.i(TAG, "<- LocationListenerNetworkCB::onLocationChanged"); 
 		}
@@ -414,7 +415,7 @@ public class BottleActivity extends Activity
 		
 			numGpsLocationUpdates++;
 
-			if (numGpsLocationUpdates == 2)
+			if (numGpsLocationUpdates == 3)
 			{
 				currentGpsLocation = location;
 				new Thread(new Runnable() 
@@ -425,11 +426,12 @@ public class BottleActivity extends Activity
 						gpsLocationsSent++;
 			        }
 				}).start();
+
+				locationManager.removeUpdates(locationListenerGpsCB);
+				locationListenerGpsRegisterd = false;
+				numGpsLocationUpdates = 0;
 			}
 			
-			locationManager.removeUpdates(locationListenerGpsCB);
-			locationListenerGpsRegisterd = false;
-
 			Log.i(TAG, "<- LocationListenerGpsCB::onLocationChanged"); 
 		}
 	};

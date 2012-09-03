@@ -46,7 +46,7 @@ public class BottleActivity extends Activity
 	String lineEnd = "\r\n";
 	String twoHyphens = "--";
 	String boundary =  "*****";
-	long periodMs = 15 * 1000;				//... First period.
+	long periodMs = 5000;				//... First period.
 	
 	TextView log;
 	Camera camera = null;
@@ -56,8 +56,11 @@ public class BottleActivity extends Activity
 	public static final String ACTION_NAME = "mamont.bottle.ALARM"; 
 	private IntentFilter alarmFilter = new IntentFilter(ACTION_NAME); 
 	
-	boolean locationNetworkSent = false;
-	boolean locationGpsSent = false;
+	
+	boolean locationListenerNetworkRegisterd = false;
+	int numNetworkLocationUpdates = 0;
+	boolean locationListenerGpsRegisterd = false;
+	int numGpsLocationUpdates = 0;
 	
 	int currentBatteryLevel = -1;
     int currentBatteryStatus = -1; 
@@ -77,6 +80,7 @@ public class BottleActivity extends Activity
     AlarmManager alarmMgr = null;
     PendingIntent alarmPending = null;
     //PowerManager powerManager;
+    LocationManager locationManager = null;
 
 	
 	
@@ -98,7 +102,8 @@ public class BottleActivity extends Activity
 
 	    //powerManager = (PowerManager)getSystemService(Context.POWER_SERVICE);
 
-		
+		locationManager = (LocationManager)this.getSystemService(Context.LOCATION_SERVICE);
+
 		
 		// Alarm.
 
@@ -193,21 +198,18 @@ public class BottleActivity extends Activity
 		
 		// Location.
 		
-		locationNetworkSent = false;
-		locationGpsSent = false;
-		LocationManager locationManager = (LocationManager)this.getSystemService(Context.LOCATION_SERVICE);
-		if (locationPeriodMs != periodMs)
+		if (!locationListenerNetworkRegisterd)
 		{
-			if (locationPeriodMs != 0)
-			{
-				locationManager.removeUpdates(locationListenerNetworkCB);
-				locationManager.removeUpdates(locationListenerGpsCB);
-			}
+			locationListenerNetworkRegisterd = true;
+			numNetworkLocationUpdates = 0;
+			locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, locationListenerNetworkCB);
+		}
 		
-			locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, periodMs / 2, 0, locationListenerNetworkCB);
-			locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, periodMs / 2, 0, locationListenerGpsCB);
-			
-			locationPeriodMs = periodMs;
+		if (!locationListenerGpsRegisterd)
+		{
+			locationListenerGpsRegisterd = true;
+			numGpsLocationUpdates = 0;
+			locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, locationListenerGpsCB);
 		}
 
 		
@@ -367,9 +369,10 @@ public class BottleActivity extends Activity
 		{
 			Log.i(TAG, "-> LocationListenerNetworkCB::onLocationChanged");
 			
-			if (!locationNetworkSent)
+			numNetworkLocationUpdates++;
+
+			if (numNetworkLocationUpdates == 2)
 			{
-				locationNetworkSent = true;
 				currentNetworkLocation = location;
 				new Thread(new Runnable() 
 				{
@@ -380,6 +383,9 @@ public class BottleActivity extends Activity
 				}).start();
 			}
 
+			locationManager.removeUpdates(locationListenerNetworkCB);
+			locationListenerNetworkRegisterd = false;
+			
 			Log.i(TAG, "<- LocationListenerNetworkCB::onLocationChanged"); 
 		}
 	};
@@ -396,9 +402,10 @@ public class BottleActivity extends Activity
 		{
 			Log.i(TAG, "-> LocationListenerGpsCB::onLocationChanged"); 
 		
-			if (!locationGpsSent)
+			numGpsLocationUpdates++;
+
+			if (numGpsLocationUpdates == 2)
 			{
-				locationGpsSent = true;
 				currentGpsLocation = location;
 				new Thread(new Runnable() 
 				{
@@ -410,6 +417,9 @@ public class BottleActivity extends Activity
 				}).start();
 			}
 			
+			locationManager.removeUpdates(locationListenerGpsCB);
+			locationListenerGpsRegisterd = false;
+
 			Log.i(TAG, "<- LocationListenerGpsCB::onLocationChanged"); 
 		}
 	};

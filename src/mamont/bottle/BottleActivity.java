@@ -28,6 +28,8 @@ import android.location.LocationManager;
 import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.PowerManager;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -64,6 +66,7 @@ public class BottleActivity extends Activity
     
     Location currentNetworkLocation;
     Location currentGpsLocation;
+    long locationPeriodMs = 0;
     
     byte[] currentPicture;
     
@@ -73,6 +76,8 @@ public class BottleActivity extends Activity
     
     AlarmManager alarmMgr = null;
     PendingIntent alarmPending = null;
+    //PowerManager powerManager;
+
 	
 	
 	@Override
@@ -90,6 +95,8 @@ public class BottleActivity extends Activity
 		window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD); 
 		window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
 		window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);*/ 
+
+	    //powerManager = (PowerManager)getSystemService(Context.POWER_SERVICE);
 
 		
 		
@@ -155,11 +162,11 @@ public class BottleActivity extends Activity
 		// Change alarm period.
 
 		int newPeriodMs;
-		if (currentBatteryLevel > 90)
+		if (currentBatteryLevel > 80)
 			newPeriodMs = 1 * 60000;
-		if (currentBatteryLevel > 75)
+		if (currentBatteryLevel > 50)
 			newPeriodMs = 5 * 60000;
-		else if (currentBatteryLevel > 50)
+		else if (currentBatteryLevel > 25)
 			newPeriodMs = 15 * 60000;
 		else if (currentBatteryLevel > 10)
 			newPeriodMs = 60 * 60000;
@@ -167,7 +174,7 @@ public class BottleActivity extends Activity
 			newPeriodMs = 4 * 60 * 60000;
 
 		
-				newPeriodMs = 60 * 1000;		//...
+				newPeriodMs = 5 * 60 * 1000;		//...
 		
 		
 		if (newPeriodMs != periodMs)
@@ -189,8 +196,19 @@ public class BottleActivity extends Activity
 		locationNetworkSent = false;
 		locationGpsSent = false;
 		LocationManager locationManager = (LocationManager)this.getSystemService(Context.LOCATION_SERVICE);
-		locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListenerNetworkCB);
-		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListenerGpsCB);
+		if (locationPeriodMs != periodMs)
+		{
+			if (locationPeriodMs != 0)
+			{
+				locationManager.removeUpdates(locationListenerNetworkCB);
+				locationManager.removeUpdates(locationListenerGpsCB);
+			}
+		
+			locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, periodMs / 2, 0, locationListenerNetworkCB);
+			locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, periodMs / 2, 0, locationListenerGpsCB);
+			
+			locationPeriodMs = periodMs;
+		}
 
 		
 		// Camera.
@@ -221,6 +239,8 @@ public class BottleActivity extends Activity
 		// Update on-screen info.
 		
 	    log.append("g=" + gpsLocationsSent + ", p=" + picturesSent + ", b=" + bytesSent + "   ");
+	    
+	    //powerManager.goToSleep(SystemClock.uptimeMillis() + 1);
 	    
 		Log.i(TAG, "<- act");
 	}

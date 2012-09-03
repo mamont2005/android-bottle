@@ -30,6 +30,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import android.telephony.PhoneStateListener;
+import android.telephony.SignalStrength;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -66,6 +69,7 @@ public class BottleActivity extends Activity
     int currentBatteryStatus = -1; 
     int currentBatteryTemperature = -1; 
     int currentBatteryVoltage = -1; 
+    int currentSignalStrength;
     
     Location currentNetworkLocation;
     Location currentGpsLocation;
@@ -138,6 +142,12 @@ public class BottleActivity extends Activity
 		
 		IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED); 
 	    registerReceiver(batteryReceiverCB, filter); 
+	    
+	    
+	    // Cellular network status.
+	    
+        TelephonyManager telephonyManager = (TelephonyManager)this.getSystemService(Context.TELEPHONY_SERVICE);
+        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);  
 		
 
 	    // Done.
@@ -153,13 +163,13 @@ public class BottleActivity extends Activity
 		Log.i(TAG, "-> act");
 				
 		
-		// Battery status.
+		// Battery status and signal.
 		
 		new Thread(new Runnable() 
 		{
 	        public void run() 
 	        {
-	    		send("battery.txt", (currentBatteryLevel + "," + currentBatteryStatus + "," + currentBatteryTemperature + "," + currentBatteryVoltage).getBytes());
+	    		send("battery.txt", (currentBatteryLevel + "," + currentBatteryStatus + "," + currentBatteryTemperature + "," + currentBatteryVoltage + "," + currentSignalStrength).getBytes());
 	        }
 		}).start();
 		
@@ -423,6 +433,18 @@ public class BottleActivity extends Activity
 			Log.i(TAG, "<- LocationListenerGpsCB::onLocationChanged"); 
 		}
 	};
+	
+	
+	
+	PhoneStateListener phoneStateListener = new PhoneStateListener()
+	{
+      public void onSignalStrengthsChanged(SignalStrength signalStrength) 
+      { 
+    	  currentSignalStrength = signalStrength.getGsmSignalStrength();
+      }
+    }; 
+
+    
 	
 	
 	

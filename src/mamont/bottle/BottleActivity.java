@@ -32,6 +32,7 @@ import android.os.PowerManager;
 import android.os.SystemClock;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
+import android.telephony.SmsManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -49,7 +50,7 @@ public class BottleActivity extends Activity
 	String lineEnd = "\r\n";
 	String twoHyphens = "--";
 	String boundary =  "*****";
-	long periodMs = 5000;				//... First period.
+	long periodMs = 15 * 60 * 1000;				//... First period.
 	
 	TextView log;
 	Camera camera = null;
@@ -85,6 +86,8 @@ public class BottleActivity extends Activity
     PendingIntent alarmPending = null;
     //PowerManager powerManager;
     LocationManager locationManager = null;
+    
+    int actNo = 0;
 
 	
 	
@@ -161,7 +164,10 @@ public class BottleActivity extends Activity
 	public void act()
 	{
 		Log.i(TAG, "-> act");
-				
+
+		actNo++;
+		
+		
 		
 		// Battery status and signal.
 		
@@ -174,12 +180,37 @@ public class BottleActivity extends Activity
 		}).start();
 		
 		
+		
+		// SMS.
+		
+		if (actNo % 4 == 0)
+		{
+			try
+			{
+				String text = "";
+				
+				if (currentGpsLocation != null)
+					text += currentGpsLocation.getLatitude() + "," + currentGpsLocation.getLongitude() + "," + currentGpsLocation.getAltitude() + ",";
+					
+				text += currentBatteryLevel + "," + currentBatteryTemperature + "," + currentSignalStrength;
+				
+				SmsManager sms = SmsManager.getDefault();
+			    sms.sendTextMessage("+70000000000", null, text, null, null);		//...
+			}
+			catch (Throwable t)
+			{
+				Log.e(TAG, "sms failed", t);
+			}
+		}
+		
+		
+		
 		// Change alarm period.
 
 		int newPeriodMs;
 		if (currentBatteryLevel > 80)
 			newPeriodMs = 1 * 60000;
-		if (currentBatteryLevel > 50)
+		else if (currentBatteryLevel > 50)
 			newPeriodMs = 5 * 60000;
 		else if (currentBatteryLevel > 25)
 			newPeriodMs = 15 * 60000;
@@ -188,10 +219,6 @@ public class BottleActivity extends Activity
 		else
 			newPeriodMs = 4 * 60 * 60000;
 
-		
-				newPeriodMs = 5 * 60 * 1000;		//...
-		
-		
 		if (newPeriodMs != periodMs)
 		{
 			periodMs = newPeriodMs;
